@@ -53,10 +53,10 @@ def main() -> None:
         config = yaml.safe_load(f)
 
     log_config = config.get("logging", {})
-    log_dir = root / log_config.get("dir", "./logs")
+    log_file = log_config.get("file", "/var/log/coleague.log")
     logger = setup_logging(
         level=log_config.get("level", "INFO"),
-        log_dir=log_dir,
+        log_file=log_file,
     )
     logger.info("=" * 50)
     logger.info("同事.agent 启动")

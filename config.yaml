@@ -15,4 +15,4 @@ agent:
 
 logging:
   level: "INFO"
-  dir: "./logs"
+  file: "./logs/coleague.log"
