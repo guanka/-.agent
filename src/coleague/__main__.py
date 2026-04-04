@@ -30,7 +30,7 @@ def main() -> None:
     parser.add_argument("--service", action="store_true", help="启动服务模式")
     args = parser.parse_args()
 
-    config_path = Path(__file__).parent / "config.yaml"
+    config_path = Path(__file__).parent.parent.parent / "config.yaml"
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
@@ -39,7 +39,7 @@ def main() -> None:
         secret=config["feishu"].get("secret"),
     )
 
-    skills_dir = Path(__file__).parent / config["skills"]["dir"]
+    skills_dir = Path(__file__).parent.parent.parent / config["skills"]["dir"]
     skill_loader = SkillLoader(skills_dir)
 
     llm_client = None
