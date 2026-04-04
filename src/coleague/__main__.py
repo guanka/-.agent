@@ -61,14 +61,15 @@ def main() -> None:
             model=config["llm"].get("model", "glm-4"),
         )
 
+    agent_name = config["agent"]["name"]
+
     agent = ColeagueAgent(
         feishu_gateway=feishu,
         skill_loader=skill_loader,
         llm_client=llm_client,
+        agent_name=agent_name,
     )
     agent.initialize()
-
-    agent_name = config["agent"]["name"]
 
     if args.tui or not config["feishu"]["webhook_url"]:
         run_tui(agent, agent_name)

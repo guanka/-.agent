@@ -14,10 +14,12 @@ class ColeagueAgent:
         feishu_gateway: FeishuGateway,
         skill_loader: SkillLoader,
         llm_client: GLMClient | None = None,
+        agent_name: str = "同事",
     ):
         self.feishu = feishu_gateway
         self.skills = skill_loader
         self.llm = llm_client
+        self.agent_name = agent_name
         self._colleague_data: dict[str, Any] | None = None
         self._conversation_history: list[Message] = []
 
@@ -38,8 +40,7 @@ class ColeagueAgent:
             return "未初始化"
 
         if self.llm is None:
-            colleague_name = self._colleague_data.get("name", "未知同事")
-            return f"[{colleague_name}] 收到消息: {message}"
+            return f"[{self.agent_name}] 收到消息: {message}"
 
         self._conversation_history.append(Message(role="user", content=message))
 
@@ -51,12 +52,9 @@ class ColeagueAgent:
         return response
 
     def _build_system_prompt(self) -> str:
-        if self._colleague_data is None:
-            return "你是一个智能助手。"
-
-        name = self._colleague_data.get("name", "未知")
-        role = self._colleague_data.get("role", "")
-        skills = self._colleague_data.get("skills", [])
+        name = self.agent_name
+        role = self._colleague_data.get("role", "") if self._colleague_data else ""
+        skills = self._colleague_data.get("skills", []) if self._colleague_data else []
 
         prompt = f"你是{name}，{role}。" if role else f"你是{name}。"
         if skills:
