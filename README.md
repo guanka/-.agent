@@ -13,8 +13,10 @@ coleague.agent/
 │   ├── agent.py             # 智能体核心
 │   ├── gateway/
 │   │   └── feishu.py        # 飞书网关
-│   └── skills/
-│       └── loader.py        # 技能加载器
+│   ├── skills/
+│   │   └── loader.py        # 技能加载器
+│   └── tui/
+│       └── app.py           # TUI 交互界面
 └── skills/                  # 同事.skill 数据目录
 ```
 
@@ -43,8 +45,29 @@ agent:
 
 ## 运行
 
+### TUI 模式 (默认，用于本地调试)
+
 ```bash
 python main.py
+```
+
+交互示例：
+
+```
+[智能体] TUI 模式启动 (输入 quit 退出)
+----------------------------------------
+> 你好
+[智能体] 张三收到消息: 你好
+> quit
+再见!
+```
+
+退出命令：`quit` / `exit` / `退出` / `q`
+
+### 服务模式
+
+```bash
+python main.py --service
 ```
 
 ## 技能数据
