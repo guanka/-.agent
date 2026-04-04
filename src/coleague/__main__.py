@@ -2,6 +2,8 @@
 
 import argparse
 import logging
+import signal
+import sys
 from pathlib import Path
 
 import yaml
@@ -37,15 +39,38 @@ def run_tui(agent: ColeagueAgent, agent_name: str) -> None:
     logger.info("TUI 模式退出")
 
 
-def run_service(agent: ColeagueAgent, agent_name: str) -> None:
+def run_service(agent: ColeagueAgent, agent_name: str, feishu_config: FeishuConfig | None) -> None:
     logger = logging.getLogger("coleague")
-    logger.info(f"{agent_name} 已启动 (服务模式)")
+    
+    if not feishu_config:
+        logger.error("飞书未配置，无法启动服务模式")
+        return
+
+    from coleague.gateway.feishu_ws import FeishuWSService
+
+    ws_service = FeishuWSService(
+        config=feishu_config,
+        message_handler=agent.process_message,
+    )
+
+    def signal_handler(sig, frame):
+        logger.info("收到退出信号")
+        ws_service.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    ws_service.start()
+    logger.info(f"{agent_name} 服务已启动 (WebSocket 模式)")
+
+    signal.pause()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="同事.agent")
     parser.add_argument("--tui", action="store_true", help="启动 TUI 模式")
-    parser.add_argument("--service", action="store_true", help="启动服务模式")
+    parser.add_argument("--service", action="store_true", help="启动服务模式 (WebSocket)")
     args = parser.parse_args()
 
     root = find_project_root()
@@ -65,14 +90,18 @@ def main() -> None:
 
     feishu_config_dict = config.get("feishu", {})
     feishu_enabled = feishu_config_dict.get("enabled", False)
+    feishu_config: FeishuConfig | None = None
 
     if feishu_enabled:
-        app_secret_cfg = feishu_config_dict.get("appSecret", {})
-        app_secret = load_secret(
-            source=app_secret_cfg.get("source", "file"),
-            provider=app_secret_cfg.get("provider", ""),
-            id=app_secret_cfg.get("id", ""),
-        )
+        app_secret_cfg = feishu_config_dict.get("appSecret", "")
+        if isinstance(app_secret_cfg, dict):
+            app_secret = load_secret(
+                source=app_secret_cfg.get("source", "file"),
+                provider=app_secret_cfg.get("provider", ""),
+                id=app_secret_cfg.get("id", ""),
+            )
+        else:
+            app_secret = str(app_secret_cfg)
 
         feishu_config = FeishuConfig(
             enabled=True,
@@ -88,7 +117,7 @@ def main() -> None:
             groups=feishu_config_dict.get("groups", {}),
         )
         feishu = FeishuGateway(feishu_config)
-        logger.info(f"飞书网关已启用: {feishu_config.app_id}")
+        logger.info(f"飞书配置已加载: {feishu_config.app_id}")
     else:
         feishu = None
         logger.info("飞书网关未启用")
@@ -117,12 +146,15 @@ def main() -> None:
     agent.initialize()
     logger.info(f"技能加载完成: {agent_name}")
 
-    if args.tui or not feishu_enabled:
+    if args.service:
+        run_service(agent, agent_name, feishu_config)
+    elif args.tui:
         run_tui(agent, agent_name)
-    elif args.service:
-        run_service(agent, agent_name)
     else:
-        run_tui(agent, agent_name)
+        if feishu_enabled:
+            run_service(agent, agent_name, feishu_config)
+        else:
+            run_tui(agent, agent_name)
 
     logger.info("同事.agent 退出")
 
