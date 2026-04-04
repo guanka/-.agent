@@ -36,8 +36,6 @@ class ColeagueAgent:
         self.logger.info(f"收到消息: {message[:100]}...")
         response = self._generate_response(message)
         self.logger.info(f"发送响应: {response[:100]}...")
-        if user_open_id and self.feishu:
-            self.feishu.send_text(response, open_id=user_open_id)
         return response
 
     def _generate_response(self, message: str) -> str:
