@@ -2,6 +2,11 @@ feishu:
   webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_URL"
   secret: ""
 
+llm:
+  provider: "glm"
+  api_key: "YOUR_API_KEY"
+  model: "glm-4"
+
 skills:
   dir: "./skills"
 

@@ -7,6 +7,7 @@ import yaml
 
 from coleague.agent import ColeagueAgent
 from coleague.gateway import FeishuGateway
+from coleague.llm import GLMClient
 from coleague.skills import SkillLoader
 from coleague.tui import TUIMode
 
@@ -41,7 +42,18 @@ def main() -> None:
     skills_dir = Path(__file__).parent / config["skills"]["dir"]
     skill_loader = SkillLoader(skills_dir)
 
-    agent = ColeagueAgent(feishu_gateway=feishu, skill_loader=skill_loader)
+    llm_client = None
+    if "llm" in config and config["llm"].get("api_key"):
+        llm_client = GLMClient(
+            api_key=config["llm"]["api_key"],
+            model=config["llm"].get("model", "glm-4"),
+        )
+
+    agent = ColeagueAgent(
+        feishu_gateway=feishu,
+        skill_loader=skill_loader,
+        llm_client=llm_client,
+    )
     agent.initialize()
 
     agent_name = config["agent"]["name"]

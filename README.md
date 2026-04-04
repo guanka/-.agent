@@ -13,6 +13,8 @@ coleague.agent/
 │   ├── agent.py             # 智能体核心
 │   ├── gateway/
 │   │   └── feishu.py        # 飞书网关
+│   ├── llm/
+│   │   └── glm.py           # 智谱 AI (GLM) 客户端
 │   ├── skills/
 │   │   └── loader.py        # 技能加载器
 │   └── tui/
@@ -35,6 +37,11 @@ pip install -e .
 feishu:
   webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_URL"
   secret: ""
+
+llm:
+  provider: "glm"
+  api_key: "YOUR_API_KEY"
+  model: "glm-4"
 
 skills:
   dir: "./skills"
