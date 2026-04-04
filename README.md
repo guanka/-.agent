@@ -7,19 +7,21 @@
 ```
 coleague.agent/
 ├── config.yaml              # 配置文件
-├── main.py                  # 启动入口
 ├── pyproject.toml           # 项目配置
 ├── src/coleague/
+│   ├── __main__.py          # 启动入口
 │   ├── agent.py             # 智能体核心
 │   ├── gateway/
 │   │   └── feishu.py        # 飞书网关
 │   ├── llm/
 │   │   └── glm.py           # 智谱 AI (GLM) 客户端
+│   ├── log.py               # 日志模块
 │   ├── skills/
 │   │   └── loader.py        # 技能加载器
 │   └── tui/
 │       └── app.py           # TUI 交互界面
-└── skills/                  # 同事.skill 数据目录
+├── chenpi.skill/            # 技能数据目录
+└── logs/                    # 日志目录 (自动创建)
 ```
 
 ## 安装
@@ -44,10 +46,14 @@ llm:
   model: "glm-4"
 
 skills:
-  dir: "./skills"
+  dir: "."          # 指向包含 .skill 目录的位置
 
 agent:
-  name: "同事"
+  name: "陈皮"
+
+logging:
+  level: "INFO"      # DEBUG, INFO, WARNING, ERROR
+  dir: "./logs"      # 日志目录
 ```
 
 ## 运行
@@ -55,36 +61,35 @@ agent:
 ### TUI 模式 (默认，用于本地调试)
 
 ```bash
-python main.py
+python -m coleague
 ```
-
-交互示例：
-
-```
-[智能体] TUI 模式启动 (输入 quit 退出)
-----------------------------------------
-> 你好
-[智能体] 张三收到消息: 你好
-> quit
-再见!
-```
-
-退出命令：`quit` / `exit` / `退出` / `q`
 
 ### 服务模式
 
 ```bash
-python main.py --service
+python -m coleague --service
+```
+
+## 日志
+
+日志同时输出到控制台和文件 `logs/coleague.log`：
+
+```
+2026-04-04 22:49:29 [INFO] coleague: 同事.agent 启动
+2026-04-04 22:49:29 [INFO] coleague.agent.陈皮: 技能加载完成: 陈皮
+2026-04-04 22:49:29 [INFO] coleague: LLM 已启用: glm-4.7
+```
+
+查看日志：
+
+```bash
+tail -f logs/coleague.log
 ```
 
 ## 技能数据
 
-在 `skills/` 目录下放置 `同事.json`，格式示例：
+技能数据来自 `{name}.skill/` 目录（如 `chenpi.skill/`），包含：
 
-```json
-{
-  "name": "张三",
-  "role": "后端工程师",
-  "skills": ["Python", "Go", "架构设计"]
-}
-```
+- `meta.json` - 元数据
+- `SKILL.md` - 系统提示词和 persona
+- `knowledge/` - 知识文档
