@@ -5,7 +5,7 @@ from typing import Any
 from coleague.gateway import FeishuGateway
 from coleague.llm import GLMClient
 from coleague.llm.glm import Message
-from coleague.skills import SkillLoader
+from coleague.skills import SkillData, SkillLoader
 
 
 class ColeagueAgent:
@@ -20,14 +20,14 @@ class ColeagueAgent:
         self.skills = skill_loader
         self.llm = llm_client
         self.agent_name = agent_name
-        self._colleague_data: dict[str, Any] | None = None
+        self._skill_data: SkillData | None = None
         self._conversation_history: list[Message] = []
 
     def initialize(self) -> None:
-        self._colleague_data = self.skills.load_colleague_skill()
+        self._skill_data = self.skills.load_colleague_skill()
 
     def process_message(self, message: str, user_open_id: str | None = None) -> str:
-        if self._colleague_data is None:
+        if self._skill_data is None:
             self.initialize()
 
         response = self._generate_response(message)
@@ -36,7 +36,7 @@ class ColeagueAgent:
         return response
 
     def _generate_response(self, message: str) -> str:
-        if self._colleague_data is None:
+        if self._skill_data is None:
             return "未初始化"
 
         if self.llm is None:
@@ -52,11 +52,7 @@ class ColeagueAgent:
         return response
 
     def _build_system_prompt(self) -> str:
-        name = self.agent_name
-        role = self._colleague_data.get("role", "") if self._colleague_data else ""
-        skills = self._colleague_data.get("skills", []) if self._colleague_data else []
+        if self._skill_data is None:
+            return f"你是{self.agent_name}。"
 
-        prompt = f"你是{name}，{role}。" if role else f"你是{name}。"
-        if skills:
-            prompt += f" 你的技能包括：{', '.join(skills)}。"
-        return prompt
+        return self._skill_data.system_prompt
