@@ -32,6 +32,10 @@ class FeishuWSService:
         event_handler = (
             EventDispatcherHandler.builder("", "")
             .register_p2_im_message_receive_v1(self._on_message)
+            .register_p2_im_message_reaction_created_v1(self._on_reaction)
+            .register_p2_im_message_reaction_deleted_v1(self._on_reaction)
+            .register_p2_im_message_recalled_v1(self._on_reaction)
+            .register_p2_im_message_message_read_v1(self._on_reaction)
             .build()
         )
 
@@ -85,6 +89,9 @@ class FeishuWSService:
 
         except Exception as e:
             self.logger.error(f"处理消息失败: {e}")
+
+    def _on_reaction(self, data) -> None:
+        pass
 
     def _is_allowed(self, user_open_id: str | None, chat_id: str | None) -> bool:
         if self.config.dm_policy == "open":
