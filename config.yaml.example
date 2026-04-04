@@ -28,7 +28,7 @@ skills:
   dir: "."
 
 agent:
-  name: "陈皮"
+  name: "王三"
 
 logging:
   level: "INFO"

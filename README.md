@@ -1,27 +1,29 @@
 # 同事.agent
 
-基于飞书网关的智能体项目。
+基于飞书网关的智能体项目，支持 WebSocket 长连接接收消息。
 
 ## 项目结构
 
 ```
 coleague.agent/
-├── config.yaml              # 配置文件
-├── pyproject.toml           # 项目配置
+├── config.yaml.example        # 配置文件模板
+├── pyproject.toml            # 项目配置
 ├── src/coleague/
-│   ├── __main__.py          # 启动入口
-│   ├── agent.py             # 智能体核心
+│   ├── __main__.py           # 启动入口
+│   ├── agent.py              # 智能体核心
 │   ├── gateway/
-│   │   └── feishu.py        # 飞书网关
+│   │   ├── feishu.py        # 飞书 API 客户端
+│   │   └── feishu_ws.py      # 飞书 WebSocket 服务
 │   ├── llm/
-│   │   └── glm.py           # 智谱 AI (GLM) 客户端
-│   ├── log.py               # 日志模块
+│   │   └── glm.py            # 智谱 AI (GLM) 客户端
+│   ├── log.py                # 日志模块
+│   ├── secrets.py            # 密钥读取模块
 │   ├── skills/
-│   │   └── loader.py        # 技能加载器
+│   │   └── loader.py         # 技能加载器
 │   └── tui/
-│       └── app.py           # TUI 交互界面
-├── chenpi.skill/            # 技能数据目录
-└── logs/                    # 日志目录 (自动创建)
+│       └── app.py            # TUI 交互界面
+├── chenpi.skill/             # 技能数据目录
+└── logs/                     # 日志目录 (自动创建)
 ```
 
 ## 安装
@@ -33,12 +35,32 @@ pip install -e .
 
 ## 配置
 
-编辑 `config.yaml`：
+复制配置文件模板并编辑：
+
+```bash
+cp config.yaml.example config.yaml
+```
+
+`config.yaml` 配置示例：
 
 ```yaml
 feishu:
-  webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_URL"
-  secret: ""
+  enabled: true
+  appId: "YOUR_APP_ID"
+  appSecret: "YOUR_APP_SECRET"
+  domain: "feishu"
+  connectionMode: "websocket"
+  requireMention: true
+  dmPolicy: "open"
+  allowFrom:
+    - "ou_xxxxxxxx"
+  groupAllowFrom:
+    - "ou_xxxxxxxx"
+    - "oc_xxxxxxxx"
+  groupPolicy: "open"
+  groups:
+    "*":
+      enabled: true
 
 llm:
   provider: "glm"
@@ -49,22 +71,22 @@ skills:
   dir: "."          # 指向包含 .skill 目录的位置
 
 agent:
-  name: "陈皮"
+  name: "王三"
 
 logging:
-  level: "INFO"      # DEBUG, INFO, WARNING, ERROR
-  dir: "./logs"      # 日志目录
+  level: "INFO"
+  file: "./logs/coleague.log"
 ```
 
 ## 运行
 
-### TUI 模式 (默认，用于本地调试)
+### TUI 模式 (本地调试)
 
 ```bash
 python -m coleague
 ```
 
-### 服务模式
+### 服务模式 (WebSocket，长连接)
 
 ```bash
 python -m coleague --service
@@ -72,12 +94,11 @@ python -m coleague --service
 
 ## 日志
 
-日志同时输出到控制台和文件 `logs/coleague.log`：
+日志输出到文件 `logs/coleague.log`：
 
 ```
-2026-04-04 22:49:29 [INFO] coleague: 同事.agent 启动
-2026-04-04 22:49:29 [INFO] coleague.agent.陈皮: 技能加载完成: 陈皮
-2026-04-04 22:49:29 [INFO] coleague: LLM 已启用: glm-4.7
+2026-04-05 07:24:07 [INFO] coleague: 同事.agent 启动
+2026-04-05 07:24:07 [INFO] coleague.feishu.ws: 飞书 WebSocket 服务已启动
 ```
 
 查看日志：
