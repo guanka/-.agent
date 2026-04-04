@@ -8,7 +8,7 @@ llm:
   model: "glm-4.7"
 
 skills:
-  dir: "./chenpi.skills"
+  dir: "./skills"
 
 agent:
   name: "陈皮"

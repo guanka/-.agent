@@ -12,6 +12,17 @@ from coleague.skills import SkillLoader
 from coleague.tui import TUIMode
 
 
+def find_project_root() -> Path:
+    import coleague
+    package_path = Path(coleague.__file__).parent
+    current = package_path.parent
+    while current != current.parent:
+        if (current / "pyproject.toml").exists() or (current / "config.yaml").exists():
+            return current
+        current = current.parent
+    return Path.cwd()
+
+
 def run_tui(agent: ColeagueAgent, agent_name: str) -> None:
     tui = TUIMode(
         process_message=agent.process_message,
@@ -30,7 +41,8 @@ def main() -> None:
     parser.add_argument("--service", action="store_true", help="启动服务模式")
     args = parser.parse_args()
 
-    config_path = Path(__file__).parent.parent.parent / "config.yaml"
+    root = find_project_root()
+    config_path = root / "config.yaml"
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
@@ -39,7 +51,7 @@ def main() -> None:
         secret=config["feishu"].get("secret"),
     )
 
-    skills_dir = Path(__file__).parent.parent.parent / config["skills"]["dir"]
+    skills_dir = root / config["skills"]["dir"]
     skill_loader = SkillLoader(skills_dir)
 
     llm_client = None
