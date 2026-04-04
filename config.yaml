@@ -4,11 +4,11 @@ feishu:
 
 llm:
   provider: "glm"
-  api_key: "YOUR_API_KEY"
-  model: "glm-4"
+  api_key: "4e7d2ba824ce069440272e191c71e83d.QEPE6Ao61qXnUw4F"
+  model: "glm-4.7"
 
 skills:
-  dir: "./skills"
+  dir: "./chenpi.skills"
 
 agent:
-  name: "同事"
+  name: "陈皮"
