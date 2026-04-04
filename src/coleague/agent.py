@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from coleague.gateway import FeishuGateway
+from coleague.gateway import FeishuConfig, FeishuGateway
 from coleague.llm import GLMClient
 from coleague.llm.glm import Message
 from coleague.skills import SkillData, SkillLoader
@@ -12,7 +12,7 @@ from coleague.skills import SkillData, SkillLoader
 class ColeagueAgent:
     def __init__(
         self,
-        feishu_gateway: FeishuGateway,
+        feishu_gateway: FeishuGateway | None,
         skill_loader: SkillLoader,
         llm_client: GLMClient | None = None,
         agent_name: str = "同事",
@@ -36,7 +36,7 @@ class ColeagueAgent:
         self.logger.info(f"收到消息: {message[:100]}...")
         response = self._generate_response(message)
         self.logger.info(f"发送响应: {response[:100]}...")
-        if user_open_id:
+        if user_open_id and self.feishu:
             self.feishu.send_text(response, open_id=user_open_id)
         return response
 

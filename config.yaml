@@ -1,11 +1,28 @@
 feishu:
-  webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_URL"
-  secret: ""
+  enabled: true
+  appId: "cli_a944ebad32b99cb0"
+  appSecret:
+    source: "file"
+    provider: "lark-secrets"
+    id: "/lark/appSecret"
+  domain: "feishu"
+  connectionMode: "websocket"
+  requireMention: true
+  dmPolicy: "open"
+  allowFrom:
+    - "ou_b000e94d42b8d11685eab27e26237f32"
+  groupAllowFrom:
+    - "ou_b000e94d42b8d11685eab27e26237f32"
+    - "oc_db02140c3408a641f366dffc0638fb3e"
+  groupPolicy: "open"
+  groups:
+    "*":
+      enabled: true
 
 llm:
   provider: "glm"
-  api_key: "4e7d2ba824ce069440272e191c71e83d.QEPE6Ao61qXnUw4F"
-  model: "glm-4.7"
+  api_key: "YOUR_API_KEY"
+  model: "glm-4"
 
 skills:
   dir: "."
