@@ -1,0 +1,35 @@
+feishu:
+  enabled: true
+  appId: "YOUR_APP_ID"
+  appSecret:
+    source: "file"
+    provider: "lark-secrets"
+    id: "/lark/appSecret"
+  domain: "feishu"
+  connectionMode: "websocket"
+  requireMention: true
+  dmPolicy: "open"
+  allowFrom:
+    - "ou_xxxxxxxx"
+  groupAllowFrom:
+    - "ou_xxxxxxxx"
+    - "oc_xxxxxxxx"
+  groupPolicy: "open"
+  groups:
+    "*":
+      enabled: true
+
+llm:
+  provider: "glm"
+  api_key: "YOUR_API_KEY"
+  model: "glm-4"
+
+skills:
+  dir: "."
+
+agent:
+  name: "陈皮"
+
+logging:
+  level: "INFO"
+  file: "./logs/coleague.log"
