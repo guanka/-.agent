@@ -1,6 +1,7 @@
 """启动入口"""
 
 import argparse
+import logging
 from pathlib import Path
 
 import yaml
@@ -8,6 +9,7 @@ import yaml
 from coleague.agent import ColeagueAgent
 from coleague.gateway import FeishuGateway
 from coleague.llm import GLMClient
+from coleague.log import setup_logging
 from coleague.skills import SkillLoader
 from coleague.tui import TUIMode
 
@@ -24,15 +26,19 @@ def find_project_root() -> Path:
 
 
 def run_tui(agent: ColeagueAgent, agent_name: str) -> None:
+    logger = logging.getLogger("coleague.tui")
     tui = TUIMode(
         process_message=agent.process_message,
         agent_name=agent_name,
     )
+    logger.info("TUI 模式启动")
     tui.start()
+    logger.info("TUI 模式退出")
 
 
 def run_service(agent: ColeagueAgent, agent_name: str) -> None:
-    print(f"{agent_name} 已启动 (服务模式)")
+    logger = logging.getLogger("coleague")
+    logger.info(f"{agent_name} 已启动 (服务模式)")
 
 
 def main() -> None:
@@ -45,6 +51,16 @@ def main() -> None:
     config_path = root / "config.yaml"
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
+
+    log_config = config.get("logging", {})
+    log_dir = root / log_config.get("dir", "./logs")
+    logger = setup_logging(
+        level=log_config.get("level", "INFO"),
+        log_dir=log_dir,
+    )
+    logger.info("=" * 50)
+    logger.info("同事.agent 启动")
+    logger.info("=" * 50)
 
     feishu = FeishuGateway(
         webhook_url=config["feishu"]["webhook_url"],
@@ -60,6 +76,9 @@ def main() -> None:
             api_key=config["llm"]["api_key"],
             model=config["llm"].get("model", "glm-4"),
         )
+        logger.info(f"LLM 已启用: {config['llm'].get('model', 'glm-4')}")
+    else:
+        logger.warning("LLM 未配置，使用模拟模式")
 
     agent_name = config["agent"]["name"]
 
@@ -70,6 +89,7 @@ def main() -> None:
         agent_name=agent_name,
     )
     agent.initialize()
+    logger.info(f"技能加载完成: {agent_name}")
 
     if args.tui or not config["feishu"]["webhook_url"]:
         run_tui(agent, agent_name)
@@ -77,6 +97,8 @@ def main() -> None:
         run_service(agent, agent_name)
     else:
         run_tui(agent, agent_name)
+
+    logger.info("同事.agent 退出")
 
 
 if __name__ == "__main__":

@@ -13,3 +13,4 @@ dist/
 .venv
 venv/
 chenpi.skill
+logs/

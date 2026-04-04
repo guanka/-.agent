@@ -1,5 +1,6 @@
 """智能体核心"""
 
+import logging
 from typing import Any
 
 from coleague.gateway import FeishuGateway
@@ -22,15 +23,19 @@ class ColeagueAgent:
         self.agent_name = agent_name
         self._skill_data: SkillData | None = None
         self._conversation_history: list[Message] = []
+        self.logger = logging.getLogger(f"coleague.agent.{agent_name}")
 
     def initialize(self) -> None:
         self._skill_data = self.skills.load_colleague_skill()
+        self.logger.info(f"技能加载完成: {self._skill_data.meta.get('name', 'unknown')}")
 
     def process_message(self, message: str, user_open_id: str | None = None) -> str:
         if self._skill_data is None:
             self.initialize()
 
+        self.logger.info(f"收到消息: {message[:100]}...")
         response = self._generate_response(message)
+        self.logger.info(f"发送响应: {response[:100]}...")
         if user_open_id:
             self.feishu.send_text(response, open_id=user_open_id)
         return response
@@ -47,6 +52,7 @@ class ColeagueAgent:
         system_prompt = self._build_system_prompt()
         all_messages = [Message(role="system", content=system_prompt)] + self._conversation_history
 
+        self.logger.debug(f"发送 {len(all_messages)} 条消息到 LLM")
         response = self.llm.chat(all_messages)
         self._conversation_history.append(Message(role="assistant", content=response))
         return response

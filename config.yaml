@@ -12,3 +12,7 @@ skills:
 
 agent:
   name: "陈皮"
+
+logging:
+  level: "INFO"
+  dir: "./logs"
