@@ -22,6 +22,8 @@ class FeishuWSService:
         self.logger = logging.getLogger("coleague.feishu.ws")
         self.feishu_gateway = FeishuGateway(config)
         self.running = False
+        self._processed_messages: set[str] = set()
+        self._processed_messages_max = 1000
 
     def start(self) -> None:
         self.logger.info("启动飞书 WebSocket 服务")
@@ -81,10 +83,18 @@ class FeishuWSService:
             chat_id = message.chat_id
             message_id = message.message_id
 
+            if not message_id or message_id in self._processed_messages:
+                self.logger.info(f"消息已处理或无message_id: {message_id}")
+                return
+
+            if len(self._processed_messages) >= self._processed_messages_max:
+                self._processed_messages.clear()
+            self._processed_messages.add(message_id)
+
             content_str = message.content or ""
             try:
                 content_obj = json.loads(content_str) if isinstance(content_str, str) else content_str
-                text = content_obj.get("text", "") if isinstance(content_obj, dict) else str(content_obj)
+                text = content_obj.get("text", "") if isinstance(content_obj, dict) else str(content_str)
             except (json.JSONDecodeError, TypeError):
                 text = str(content_str)
 
