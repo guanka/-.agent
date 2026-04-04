@@ -14,3 +14,4 @@ dist/
 venv/
 chenpi.skill
 logs/
+config.yaml
