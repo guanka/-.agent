@@ -63,14 +63,21 @@ class FeishuWSService:
 
     def _on_message(self, data) -> None:
         try:
-            self.logger.info(f"收到消息: {data}")
+            self.logger.info(f"收到消息事件")
 
-            sender = data.sender
-            message = data.message
+            event = data.event
+            if not event:
+                return
+
+            sender = event.sender
+            message = event.message
             if not message:
                 return
 
-            user_open_id = sender.open_id if sender else None
+            user_open_id = None
+            if sender and sender.sender_id:
+                user_open_id = sender.sender_id.open_id
+
             chat_id = message.chat_id
             message_id = message.message_id
 
@@ -80,6 +87,8 @@ class FeishuWSService:
                 text = content_obj.get("text", "") if isinstance(content_obj, dict) else str(content_obj)
             except (json.JSONDecodeError, TypeError):
                 text = str(content_str)
+
+            self.logger.info(f"消息内容: {text[:100]}..., 用户: {user_open_id}, 聊天: {chat_id}")
 
             if self._is_allowed(user_open_id, chat_id):
                 response = self.message_handler(text, user_open_id)
