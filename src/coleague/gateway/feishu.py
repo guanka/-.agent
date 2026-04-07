@@ -46,8 +46,9 @@ class FeishuGateway:
         response = self.session.post(url, json=payload)
         response.raise_for_status()
         data = response.json()
-        self._tenant_access_token = data.get("tenant_access_token", "")
-        return self._tenant_access_token
+        token: str = data.get("tenant_access_token") or ""
+        self._tenant_access_token = token
+        return token
 
     def send_message(self, message: FeishuMessage) -> dict[str, Any]:
         token = self.get_tenant_access_token()

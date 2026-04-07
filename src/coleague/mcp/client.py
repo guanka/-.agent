@@ -104,35 +104,97 @@ class MCPClient:
             self.logger.warning(f"SSH 命令返回错误: {text[:100]}")
         return text
 
-    def get_tool_schema(self) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": "exec_ssh",
-                "description": "通过SSH跳板机连接到工厂工站或设备并执行命令。工站使用密码认证，设备使用证书认证。",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "station": {
-                            "type": "string",
-                            "enum": ["poincare", "galois_p2", "galois_m4", "shenzhou"],
-                            "description": "工站名称：poincare(庞加莱), galois_p2(伽罗华P2), galois_m4(伽罗华M4), shenzhou(神州)",
+    def scp_file(
+        self,
+        station: str,
+        target_type: str,
+        target_ip: str,
+        remote_path: str,
+        local_path: str,
+    ) -> str:
+        result = self.call_tool(
+            "scp_file",
+            {
+                "station": station,
+                "target_type": target_type,
+                "target_ip": target_ip,
+                "remote_path": remote_path,
+                "local_path": local_path,
+            },
+        )
+        content = result.get("content", [])
+        text = "\n".join(c.get("text", "") for c in content if c.get("type") == "text")
+        is_error = result.get("isError", False)
+        if is_error:
+            self.logger.warning(f"SCP 文件下载返回错误: {text[:100]}")
+        return text
+
+    def get_tool_schema(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "exec_ssh",
+                    "description": "通过SSH跳板机连接到工厂工站或设备并执行命令。工站使用密码认证，设备使用证书认证。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "station": {
+                                "type": "string",
+                                "enum": ["poincare", "galois_p2", "galois_m4", "shenzhou"],
+                                "description": "工站名称：poincare(庞加莱), galois_p2(伽罗华P2), galois_m4(伽罗华M4), shenzhou(神州)",
+                            },
+                            "target_type": {
+                                "type": "string",
+                                "enum": ["workstation", "device"],
+                                "description": "目标类型：workstation(工站主机) 或 device(设备，使用证书认证)",
+                            },
+                            "target_ip": {
+                                "type": "string",
+                                "description": "目标机器的 IP 地址",
+                            },
+                            "command": {
+                                "type": "string",
+                                "description": "要在目标机器上执行的 shell 命令",
+                            },
                         },
-                        "target_type": {
-                            "type": "string",
-                            "enum": ["workstation", "device"],
-                            "description": "目标类型：workstation(工站主机) 或 device(设备，使用证书认证)",
-                        },
-                        "target_ip": {
-                            "type": "string",
-                            "description": "目标机器的 IP 地址",
-                        },
-                        "command": {
-                            "type": "string",
-                            "description": "要在目标机器上执行的 shell 命令",
-                        },
+                        "required": ["station", "target_type", "target_ip", "command"],
                     },
-                    "required": ["station", "target_type", "target_ip", "command"],
                 },
             },
-        }
+            {
+                "type": "function",
+                "function": {
+                    "name": "scp_file",
+                    "description": "通过SCP/SFTP下载远程主机上的文件到本地，支持工站与设备两种目标类型，并复用跳板链连接。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "station": {
+                                "type": "string",
+                                "enum": ["poincare", "galois_p2", "galois_m4", "shenzhou"],
+                                "description": "工站名称：poincare(庞加莱), galois_p2(伽罗华P2), galois_m4(伽罗华M4), shenzhou(神州)",
+                            },
+                            "target_type": {
+                                "type": "string",
+                                "enum": ["workstation", "device"],
+                                "description": "目标类型：workstation(工站主机) 或 device(设备，使用证书认证)",
+                            },
+                            "target_ip": {
+                                "type": "string",
+                                "description": "目标机器的 IP 地址",
+                            },
+                            "remote_path": {
+                                "type": "string",
+                                "description": "远程文件路径（在目标机器上）",
+                            },
+                            "local_path": {
+                                "type": "string",
+                                "description": "本地保存路径（自动创建父目录）",
+                            },
+                        },
+                        "required": ["station", "target_type", "target_ip", "remote_path", "local_path"],
+                    },
+                },
+            },
+        ]

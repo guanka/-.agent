@@ -1,5 +1,3 @@
-"""启动入口"""
-
 import argparse
 import logging
 import signal
@@ -135,6 +133,22 @@ def main() -> None:
     else:
         logger.warning("LLM 未配置，使用模拟模式")
 
+    mcp_client = None
+    mcp_cfg = config.get("mcp", {})
+    if mcp_cfg.get("enabled", False):
+        from coleague.mcp import MCPClient
+        mcp_path = root / mcp_cfg.get("factory_path", "mcp/factory-mcp")
+        mcp_client = MCPClient(mcp_dir=mcp_path, timeout=mcp_cfg.get("timeout", 30))
+        logger.info(f"MCP 已启用: {mcp_path}")
+
+    knowledge_loader = None
+    knowledge_cfg = config.get("knowledge", {})
+    if knowledge_cfg.get("enabled", False):
+        from coleague.knowledge import KnowledgeLoader
+        knowledge_path = root / knowledge_cfg.get("dir", "knowledge")
+        knowledge_loader = KnowledgeLoader(knowledge_dir=knowledge_path)
+        logger.info(f"知识库已启用: {knowledge_path}")
+
     agent_name = config["agent"]["name"]
 
     agent = ColeagueAgent(
@@ -142,6 +156,8 @@ def main() -> None:
         skill_loader=skill_loader,
         llm_client=llm_client,
         agent_name=agent_name,
+        mcp_client=mcp_client,
+        knowledge_loader=knowledge_loader,
     )
     agent.initialize()
     logger.info(f"技能加载完成: {agent_name}")
