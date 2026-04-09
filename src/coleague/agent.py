@@ -106,6 +106,12 @@ class ColeagueAgent:
                 history.append(result_msg)
                 self._conversation_history.append(result_msg)
 
+            # 有文件待发送时直接返回，不再让 LLM 生成多余文字
+            if self._pending_files:
+                summary = f"文件已下载: {', '.join(os.path.basename(f) for f in self._pending_files)}"
+                self._conversation_history.append(Message(role="assistant", content=summary))
+                return summary
+
         return "工具调用次数超限"
 
     def _dispatch_tool(self, tool_call: dict) -> str:
