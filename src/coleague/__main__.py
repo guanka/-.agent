@@ -162,17 +162,20 @@ def main() -> None:
     agent.initialize()
     logger.info(f"技能加载完成: {agent_name}")
 
-    if args.service:
-        run_service(agent, agent_name, feishu_config)
-    elif args.tui:
-        run_tui(agent, agent_name)
-    else:
-        if feishu_enabled:
+    try:
+        if args.service:
             run_service(agent, agent_name, feishu_config)
-        else:
+        elif args.tui:
             run_tui(agent, agent_name)
-
-    logger.info("同事.agent 退出")
+        else:
+            if feishu_enabled:
+                run_service(agent, agent_name, feishu_config)
+            else:
+                run_tui(agent, agent_name)
+    finally:
+        if mcp_client:
+            mcp_client.close()
+        logger.info("同事.agent 退出")
 
 
 if __name__ == "__main__":

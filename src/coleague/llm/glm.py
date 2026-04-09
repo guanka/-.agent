@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import logging
+import time
 from typing import Any
 
 import requests
@@ -14,6 +15,9 @@ class Message:
 
 
 class GLMClient:
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = (2, 5, 10)
+
     def __init__(
         self,
         api_key: str,
@@ -27,16 +31,29 @@ class GLMClient:
         self.session.headers.update({"Authorization": f"Bearer {api_key}"})
         self.logger = logging.getLogger("coleague.llm")
 
+    def _post(self, payload: dict) -> dict:
+        for attempt in range(self.MAX_RETRIES + 1):
+            response = self.session.post(f"{self.base_url}/chat/completions", json=payload)
+            if response.status_code == 429 and attempt < self.MAX_RETRIES:
+                wait = self.RETRY_BACKOFF[attempt]
+                self.logger.warning(f"GLM 429 限流，{wait}s 后重试 ({attempt + 1}/{self.MAX_RETRIES})")
+                time.sleep(wait)
+                continue
+            if not response.ok:
+                self.logger.error(f"GLM API 错误 {response.status_code}: {response.text[:500]}")
+            response.raise_for_status()
+            data = response.json()
+            self._log_usage(data)
+            return data
+        raise RuntimeError("GLM API 重试次数耗尽")
+
     def chat(self, messages: list[Message], **kwargs: Any) -> str:
         payload = {
             "model": self.model,
             "messages": [self._serialize(m) for m in messages],
             **kwargs,
         }
-        response = self.session.post(f"{self.base_url}/chat/completions", json=payload)
-        response.raise_for_status()
-        data = response.json()
-        self._log_usage(data)
+        data = self._post(payload)
         return data["choices"][0]["message"]["content"]
 
     def chat_with_tools(
@@ -49,10 +66,7 @@ class GLMClient:
             "messages": [self._serialize(m) for m in messages],
             "tools": tools,
         }
-        response = self.session.post(f"{self.base_url}/chat/completions", json=payload)
-        response.raise_for_status()
-        data = response.json()
-        self._log_usage(data)
+        data = self._post(payload)
         return data["choices"][0]["message"]
 
     def _log_usage(self, data: dict[str, Any]) -> None:

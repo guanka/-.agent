@@ -9,77 +9,100 @@ from typing import Any
 
 
 class MCPClient:
-    def __init__(self, mcp_dir: str | Path, timeout: int = 30):
+    def __init__(self, mcp_dir: str | Path, timeout: int = 120):
         self.mcp_dir = Path(mcp_dir)
         self.timeout = timeout
         self.logger = logging.getLogger("coleague.mcp")
+        self._proc: subprocess.Popen | None = None
+        self._req_id = 0
+        self._initialized = False
+
+    def _ensure_started(self) -> subprocess.Popen:
+        if self._proc and self._proc.poll() is None:
+            return self._proc
+
+        self.logger.info("启动 MCP 子进程")
+        self._proc = subprocess.Popen(
+            ["node", "dist/index.js"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=self.mcp_dir,
+            env={**os.environ},
+        )
+        self._initialized = False
+        self._do_initialize()
+        return self._proc
+
+    def _next_id(self) -> int:
+        self._req_id += 1
+        return self._req_id
+
+    def _send_and_recv(self, payload: dict) -> dict:
+        proc = self._ensure_started()
+        data = json.dumps(payload) + "\n"
+        proc.stdin.write(data.encode("utf-8"))
+        proc.stdin.flush()
+
+        fd = proc.stdout.fileno()
+        buf = b""
+        deadline = time.time() + self.timeout
+        while time.time() < deadline:
+            ready, _, _ = select.select([fd], [], [], 1.0)
+            if ready:
+                chunk = os.read(fd, 4096)
+                if not chunk:
+                    raise RuntimeError("MCP 子进程已退出")
+                buf += chunk
+                if b"\n" in buf:
+                    line = buf[: buf.index(b"\n")].decode("utf-8").strip()
+                    if line:
+                        return json.loads(line)
+        raise RuntimeError(f"MCP 调用超时 ({self.timeout}s)")
+
+    def _do_initialize(self) -> None:
+        resp = self._send_and_recv({
+            "jsonrpc": "2.0",
+            "id": self._next_id(),
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "coleague-agent", "version": "0.1.0"},
+            },
+        })
+        self.logger.info(f"MCP 初始化完成: {resp.get('result', {}).get('serverInfo', {})}")
+
+        # 发送 initialized 通知（无 id，无需等待响应）
+        proc = self._proc
+        notif = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
+        proc.stdin.write(notif.encode("utf-8"))
+        proc.stdin.flush()
+        self._initialized = True
 
     def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        payload = {
+        self.logger.debug(f"MCP 调用: {tool_name} {arguments}")
+        resp = self._send_and_recv({
             "jsonrpc": "2.0",
-            "id": 1,
+            "id": self._next_id(),
             "method": "tools/call",
             "params": {"name": tool_name, "arguments": arguments},
-        }
-        input_data = json.dumps(payload) + "\n"
-        self.logger.debug(f"MCP 调用: {tool_name} {arguments}")
-
-        proc = None
-        stdout_line = b""
-        try:
-            proc = subprocess.Popen(
-                ["node", "dist/index.js"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=self.mcp_dir,
-            )
-            proc.stdin.write(input_data.encode("utf-8"))
-            proc.stdin.flush()
-            proc.stdin.close()
-
-            fd = proc.stdout.fileno()
-            deadline = time.time() + self.timeout
-            while time.time() < deadline:
-                ready = select.select([fd], [], [], 0.1)[0]
-                if ready:
-                    chunk = os.read(fd, 4096)
-                    if not chunk:
-                        break
-                    stdout_line += chunk
-                    if b"\n" in stdout_line:
-                        stdout_line = stdout_line[:stdout_line.index(b"\n")]
-                        break
-        except FileNotFoundError:
-            raise RuntimeError("node 未找到，请确认 Node.js 已安装")
-        finally:
-            if proc:
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=3)
-                except Exception:
-                    pass
-
-        stdout_text = stdout_line.decode("utf-8").strip()
-        if not stdout_text:
-            stderr = b""
-            if proc:
-                try:
-                    stderr = proc.stderr.read()
-                except Exception:
-                    pass
-            raise RuntimeError(f"MCP 无输出: {stderr.decode('utf-8', errors='replace')[:200]}")
-
-        try:
-            response = json.loads(stdout_text)
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"MCP 响应解析失败: {e}\n原始输出: {stdout_text[:200]}")
-
-        if "error" in response:
-            err = response["error"]
+        })
+        if "error" in resp:
+            err = resp["error"]
             raise RuntimeError(f"MCP 错误 {err.get('code')}: {err.get('message')}")
+        return resp.get("result", {})
 
-        return response.get("result", {})
+    def close(self) -> None:
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+            self.logger.info("MCP 子进程已关闭")
+        self._proc = None
+        self._initialized = False
 
     def exec_ssh(
         self,

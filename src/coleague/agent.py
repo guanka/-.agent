@@ -68,7 +68,7 @@ class ColeagueAgent:
     def _generate_with_tools(self, messages: list[Message]) -> str:
         assert self.mcp is not None
         assert self.llm is not None
-        tools = [self.mcp.get_tool_schema()]
+        tools = self.mcp.get_tool_schema()
         history = list(messages)
 
         for _ in range(10):
@@ -120,6 +120,19 @@ class ColeagueAgent:
             except Exception as e:
                 self.logger.error(f"exec_ssh 失败: {e}")
                 return f"[SSH错误] {e}"
+
+        if name == "scp_file" and self.mcp:
+            try:
+                return self.mcp.scp_file(
+                    station=args["station"],
+                    target_type=args["target_type"],
+                    target_ip=args["target_ip"],
+                    remote_path=args["remote_path"],
+                    local_path=args["local_path"],
+                )
+            except Exception as e:
+                self.logger.error(f"scp_file 失败: {e}")
+                return f"[SCP错误] {e}"
 
         return f"[未知工具: {name}]"
 
