@@ -74,6 +74,24 @@ class FeishuGateway:
         )
         return self.send_message(message)
 
+    def add_reaction(self, message_id: str, emoji_type: str = "OnIt") -> str | None:
+        """给消息添加表情回复，返回 reaction_id"""
+        token = self.get_tenant_access_token()
+        url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reactions"
+        headers = {"Authorization": f"Bearer {token}"}
+        payload = {"reaction_type": {"emoji_type": emoji_type}}
+        resp = self.session.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json().get("data", {}).get("reaction_id")
+
+    def delete_reaction(self, message_id: str, reaction_id: str) -> None:
+        """删除表情回复"""
+        token = self.get_tenant_access_token()
+        url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reactions/{reaction_id}"
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = self.session.delete(url, headers=headers)
+        resp.raise_for_status()
+
     def upload_file(self, file_path: str, file_type: str = "stream") -> str | None:
         """上传文件到飞书，返回 file_key"""
         import os

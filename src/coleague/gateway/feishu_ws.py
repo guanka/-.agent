@@ -103,7 +103,22 @@ class FeishuWSService:
             self.logger.info(f"消息内容: {text[:100]}..., 用户: {user_open_id}, 聊天: {chat_id}")
 
             if self._is_allowed(user_open_id, chat_id):
+                # 先加表情表示正在处理
+                reaction_id = None
+                try:
+                    reaction_id = self.feishu_gateway.add_reaction(message_id, "OnIt")
+                except Exception as e:
+                    self.logger.warning(f"添加表情失败: {e}")
+
                 response = self.message_handler(text, user_open_id)
+
+                # 处理完成，删除表情
+                if reaction_id:
+                    try:
+                        self.feishu_gateway.delete_reaction(message_id, reaction_id)
+                    except Exception as e:
+                        self.logger.warning(f"删除表情失败: {e}")
+
                 self._send_reply(message_id, response)
                 if self.agent:
                     for fp in self.agent.pop_pending_files():
