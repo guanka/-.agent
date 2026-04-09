@@ -4,7 +4,7 @@ import json
 import logging
 import signal
 import sys
-from typing import Callable
+from typing import Any, Callable
 
 import requests
 
@@ -16,9 +16,11 @@ class FeishuWSService:
         self,
         config: FeishuConfig,
         message_handler: Callable[[str, str | None], str],
+        agent: Any = None,
     ):
         self.config = config
         self.message_handler = message_handler
+        self.agent = agent
         self.logger = logging.getLogger("coleague.feishu.ws")
         self.feishu_gateway = FeishuGateway(config)
         self.running = False
@@ -103,6 +105,9 @@ class FeishuWSService:
             if self._is_allowed(user_open_id, chat_id):
                 response = self.message_handler(text, user_open_id)
                 self._send_reply(message_id, response)
+                if self.agent:
+                    for fp in self.agent.pop_pending_files():
+                        self._send_file_reply(message_id, fp)
             else:
                 self.logger.info(f"用户 {user_open_id} 不在白名单中")
 
@@ -138,3 +143,25 @@ class FeishuWSService:
             self.logger.info(f"回复已发送: {message_id}")
         except Exception as e:
             self.logger.error(f"发送回复失败: {e}")
+
+    def _send_file_reply(self, message_id: str, file_path: str) -> None:
+        try:
+            file_key = self.feishu_gateway.upload_file(file_path)
+            if not file_key:
+                self.logger.error("文件上传失败，未获取到 file_key")
+                return
+            token = self.feishu_gateway.get_tenant_access_token()
+            url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reply"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "msg_type": "file",
+                "content": json.dumps({"file_key": file_key}),
+            }
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            self.logger.info(f"文件回复已发送: {message_id}")
+        except Exception as e:
+            self.logger.error(f"发送文件回复失败: {e}")

@@ -49,6 +49,7 @@ def run_service(agent: ColeagueAgent, agent_name: str, feishu_config: FeishuConf
     ws_service = FeishuWSService(
         config=feishu_config,
         message_handler=agent.process_message,
+        agent=agent,
     )
 
     def signal_handler(sig, frame):

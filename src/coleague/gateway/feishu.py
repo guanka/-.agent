@@ -74,6 +74,23 @@ class FeishuGateway:
         )
         return self.send_message(message)
 
+    def upload_file(self, file_path: str, file_type: str = "stream") -> str | None:
+        """上传文件到飞书，返回 file_key"""
+        import os
+        token = self.get_tenant_access_token()
+        url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/files"
+        headers = {"Authorization": f"Bearer {token}"}
+        file_name = os.path.basename(file_path)
+        with open(file_path, "rb") as f:
+            resp = self.session.post(
+                url,
+                headers=headers,
+                data={"file_type": file_type, "file_name": file_name},
+                files={"file": (file_name, f)},
+            )
+        resp.raise_for_status()
+        return resp.json().get("data", {}).get("file_key")
+
     def is_user_allowed(self, user_open_id: str | None, chat_id: str | None = None) -> bool:
         if self.config.dm_policy == "open":
             return True

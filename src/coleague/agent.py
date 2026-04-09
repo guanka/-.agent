@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Any
 
 from coleague.gateway import FeishuConfig, FeishuGateway
@@ -27,6 +28,7 @@ class ColeagueAgent:
         self._skill_data: SkillData | None = None
         self._knowledge_context: str = ""
         self._conversation_history: list[Message] = []
+        self._pending_files: list[str] = []
         self.logger = logging.getLogger(f"coleague.agent.{agent_name}")
 
     def initialize(self) -> None:
@@ -42,10 +44,16 @@ class ColeagueAgent:
         if self._skill_data is None:
             self.initialize()
 
+        self._pending_files.clear()
         self.logger.info(f"收到消息: {message[:100]}...")
         response = self._generate_response(message)
         self.logger.info(f"发送响应: {response[:100]}...")
         return response
+
+    def pop_pending_files(self) -> list[str]:
+        files = list(self._pending_files)
+        self._pending_files.clear()
+        return files
 
     def _generate_response(self, message: str) -> str:
         if self._skill_data is None:
@@ -123,13 +131,17 @@ class ColeagueAgent:
 
         if name == "scp_file" and self.mcp:
             try:
-                return self.mcp.scp_file(
+                result = self.mcp.scp_file(
                     station=args["station"],
                     target_type=args["target_type"],
                     target_ip=args["target_ip"],
                     remote_path=args["remote_path"],
                     local_path=args["local_path"],
                 )
+                local_path = args.get("local_path", "")
+                if local_path and os.path.isfile(local_path):
+                    self._pending_files.append(local_path)
+                return result
             except Exception as e:
                 self.logger.error(f"scp_file 失败: {e}")
                 return f"[SCP错误] {e}"
