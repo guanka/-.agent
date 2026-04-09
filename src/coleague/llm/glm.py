@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 import logging
 import time
 from typing import Any
@@ -27,25 +28,42 @@ class GLMClient:
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
+        self._is_minimax = "minimax" in base_url
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"Bearer {api_key}"})
         self.logger = logging.getLogger("coleague.llm")
 
     def _post(self, payload: dict) -> dict:
+        url = self.base_url if self.base_url.endswith(("/completions", "/chatcompletion_v2")) \
+            else f"{self.base_url}/chat/completions"
+        if self._is_minimax:
+            payload.setdefault("reasoning_split", True)
         for attempt in range(self.MAX_RETRIES + 1):
-            response = self.session.post(f"{self.base_url}/chat/completions", json=payload)
-            if response.status_code == 429 and attempt < self.MAX_RETRIES:
+            response = self.session.post(url, json=payload)
+            if response.status_code in (429, 529) and attempt < self.MAX_RETRIES:
                 wait = self.RETRY_BACKOFF[attempt]
-                self.logger.warning(f"GLM 429 限流，{wait}s 后重试 ({attempt + 1}/{self.MAX_RETRIES})")
+                self.logger.warning(f"限流 {response.status_code}，{wait}s 后重试 ({attempt + 1}/{self.MAX_RETRIES})")
                 time.sleep(wait)
                 continue
             if not response.ok:
-                self.logger.error(f"GLM API 错误 {response.status_code}: {response.text[:500]}")
+                self.logger.error(f"LLM API 错误 {response.status_code}: {response.text[:500]}")
             response.raise_for_status()
-            data = response.json()
+            # MiniMax 错误响应可能包含多行 JSON，只取第一行
+            text = response.text.strip()
+            data = json.loads(text.split("\n", 1)[0])
+            if data.get("type") == "error":
+                err = data.get("error", {})
+                msg = err.get("message", "")
+                # MiniMax 过载(2064)：HTTP 200 但 body 报错，需重试
+                if "2064" in msg and attempt < self.MAX_RETRIES:
+                    wait = self.RETRY_BACKOFF[attempt]
+                    self.logger.warning(f"MiniMax 过载，{wait}s 后重试 ({attempt + 1}/{self.MAX_RETRIES})")
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(f"LLM API 错误: {msg or text[:200]}")
             self._log_usage(data)
             return data
-        raise RuntimeError("GLM API 重试次数耗尽")
+        raise RuntimeError("LLM API 重试次数耗尽")
 
     def chat(self, messages: list[Message], **kwargs: Any) -> str:
         payload = {

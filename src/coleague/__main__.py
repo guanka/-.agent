@@ -124,13 +124,22 @@ def main() -> None:
     skills_dir = root / config["skills"]["dir"]
     skill_loader = SkillLoader(skills_dir)
 
+    _LLM_BASE_URLS = {
+        "glm": "https://open.bigmodel.cn/api/paas/v4",
+        "minimax": "https://api.minimaxi.com/v1/text/chatcompletion_v2",
+    }
+
     llm_client = None
     if "llm" in config and config["llm"].get("api_key"):
+        provider = config["llm"].get("provider", "glm")
+        model = config["llm"].get("model", "glm-4")
+        base_url = config["llm"].get("base_url") or _LLM_BASE_URLS.get(provider, _LLM_BASE_URLS["glm"])
         llm_client = GLMClient(
             api_key=config["llm"]["api_key"],
-            model=config["llm"].get("model", "glm-4"),
+            model=model,
+            base_url=base_url,
         )
-        logger.info(f"LLM 已启用: {config['llm'].get('model', 'glm-4')}")
+        logger.info(f"LLM 已启用: {provider}/{model}")
     else:
         logger.warning("LLM 未配置，使用模拟模式")
 
