@@ -18,6 +18,7 @@ class ColeagueAgent:
         agent_name: str = "同事",
         mcp_client: Any | None = None,
         knowledge_loader: Any | None = None,
+        memory: Any | None = None,
     ):
         self.feishu = feishu_gateway
         self.skills = skill_loader
@@ -25,6 +26,7 @@ class ColeagueAgent:
         self.agent_name = agent_name
         self.mcp = mcp_client
         self.knowledge = knowledge_loader
+        self.memory = memory
         self._skill_data: SkillData | None = None
         self._knowledge_context: str = ""
         self._conversation_history: list[Message] = []
@@ -62,16 +64,34 @@ class ColeagueAgent:
         if self.llm is None:
             return f"[{self.agent_name}] 收到消息: {message}"
 
+        # 搜索相关记忆
+        memory_context = ""
+        if self.memory:
+            hits = self.memory.search(message)
+            memory_context = self.memory.format_context(hits)
+            if memory_context:
+                self.logger.info(f"找到 {len(hits)} 条相关记忆")
+
         self._conversation_history.append(Message(role="user", content=message))
-        system_prompt = self._build_system_prompt()
+        system_prompt = self._build_system_prompt(memory_context=memory_context)
         all_messages = [Message(role="system", content=system_prompt)] + self._conversation_history
 
-        if self.mcp:
-            return self._generate_with_tools(all_messages)
+        try:
+            if self.mcp:
+                response = self._generate_with_tools(all_messages)
+            else:
+                response = self.llm.chat(all_messages)
+                self._conversation_history.append(Message(role="assistant", content=response))
 
-        response = self.llm.chat(all_messages)
-        self._conversation_history.append(Message(role="assistant", content=response))
-        return response
+            # 存储对话记忆
+            if self.memory:
+                self.memory.store(message, response)
+
+            return response
+        except Exception as e:
+            self.logger.error(f"LLM 调用失败: {e}")
+            self._conversation_history.pop()  # 移除刚加的 user 消息
+            return "买的傻B LLM 用不了，花点钱换个吧！"
 
     def _generate_with_tools(self, messages: list[Message]) -> str:
         assert self.mcp is not None
@@ -130,6 +150,8 @@ class ColeagueAgent:
                     target_type=args["target_type"],
                     target_ip=args["target_ip"],
                     command=args["command"],
+                    username=args.get("username"),
+                    password=args.get("password"),
                 )
             except Exception as e:
                 self.logger.error(f"exec_ssh 失败: {e}")
@@ -143,6 +165,8 @@ class ColeagueAgent:
                     target_ip=args["target_ip"],
                     remote_path=args["remote_path"],
                     local_path=args["local_path"],
+                    username=args.get("username"),
+                    password=args.get("password"),
                 )
                 local_path = args.get("local_path", "")
                 if local_path and os.path.isfile(local_path):
@@ -154,11 +178,13 @@ class ColeagueAgent:
 
         return f"[未知工具: {name}]"
 
-    def _build_system_prompt(self) -> str:
+    def _build_system_prompt(self, memory_context: str = "") -> str:
         if self._skill_data is None:
             return f"你是{self.agent_name}。"
 
         parts = [self._skill_data.system_prompt]
         if self._knowledge_context:
             parts.append(self._knowledge_context)
+        if memory_context:
+            parts.append(memory_context)
         return "\n\n".join(parts)

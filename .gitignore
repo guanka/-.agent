@@ -12,6 +12,5 @@ dist/
 .env
 .venv
 venv/
-chenpi.skill
 logs/
 config.yaml

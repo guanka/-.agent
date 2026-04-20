@@ -1,0 +1,9 @@
+[submodule "knowledge/structure"]
+	path = knowledge/structure
+	url = git@git.lianjia.com:vrlab_bsp/sub_guanka001/device_knowledge.git
+[submodule "mcp/factory_mcp"]
+	path = mcp/factory_mcp
+	url = git@git.lianjia.com:vrlab_bsp/sub_guanka001/factory_mcp.git
+[submodule "skills/chenpi.skill"]
+	path = skills/chenpi.skill
+	url = git@git.lianjia.com:vrlab_bsp/chenpi.skill.git

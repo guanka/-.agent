@@ -159,6 +159,16 @@ def main() -> None:
         knowledge_loader = KnowledgeLoader(knowledge_dir=knowledge_path)
         logger.info(f"知识库已启用: {knowledge_path}")
 
+    memory = None
+    memory_cfg = config.get("memory", {})
+    if memory_cfg.get("enabled", False):
+        from coleague.memory import Memory
+        memory = Memory(
+            palace_path=memory_cfg.get("palace_path"),
+            wing=memory_cfg.get("wing", "coleague"),
+        )
+        logger.info(f"记忆系统已启用: {memory.palace_path}")
+
     agent_name = config["agent"]["name"]
 
     agent = ColeagueAgent(
@@ -168,6 +178,7 @@ def main() -> None:
         agent_name=agent_name,
         mcp_client=mcp_client,
         knowledge_loader=knowledge_loader,
+        memory=memory,
     )
     agent.initialize()
     logger.info(f"技能加载完成: {agent_name}")

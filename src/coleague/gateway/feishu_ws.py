@@ -4,6 +4,7 @@ import json
 import logging
 import signal
 import sys
+import threading
 from typing import Any, Callable
 
 import requests
@@ -103,29 +104,39 @@ class FeishuWSService:
             self.logger.info(f"消息内容: {text[:100]}..., 用户: {user_open_id}, 聊天: {chat_id}")
 
             if self._is_allowed(user_open_id, chat_id):
-                # 先加表情表示正在处理
-                reaction_id = None
-                try:
-                    reaction_id = self.feishu_gateway.add_reaction(message_id, "OnIt")
-                except Exception as e:
-                    self.logger.warning(f"添加表情失败: {e}")
-
-                response = self.message_handler(text, user_open_id)
-
-                # 处理完成，删除表情
-                if reaction_id:
-                    try:
-                        self.feishu_gateway.delete_reaction(message_id, reaction_id)
-                    except Exception as e:
-                        self.logger.warning(f"删除表情失败: {e}")
-
-                self._send_reply(message_id, response)
-                if self.agent:
-                    for fp in self.agent.pop_pending_files():
-                        self._send_file_reply(message_id, fp)
+                threading.Thread(
+                    target=self._handle_allowed_message,
+                    args=(message_id, text, user_open_id),
+                    daemon=True,
+                ).start()
             else:
                 self.logger.info(f"用户 {user_open_id} 不在白名单中")
 
+        except Exception as e:
+            self.logger.error(f"处理消息失败: {e}")
+
+    def _handle_allowed_message(self, message_id: str, text: str, user_open_id: str | None) -> None:
+        try:
+            # 先加表情表示正在处理
+            reaction_id = None
+            try:
+                reaction_id = self.feishu_gateway.add_reaction(message_id, "OnIt")
+            except Exception as e:
+                self.logger.warning(f"添加表情失败: {e}")
+
+            response = self.message_handler(text, user_open_id)
+
+            # 处理完成，删除表情
+            if reaction_id:
+                try:
+                    self.feishu_gateway.delete_reaction(message_id, reaction_id)
+                except Exception as e:
+                    self.logger.warning(f"删除表情失败: {e}")
+
+            self._send_reply(message_id, response)
+            if self.agent:
+                for fp in self.agent.pop_pending_files():
+                    self._send_file_reply(message_id, fp)
         except Exception as e:
             self.logger.error(f"处理消息失败: {e}")
 
@@ -142,41 +153,53 @@ class FeishuWSService:
         return False
 
     def _send_reply(self, message_id: str, text: str) -> None:
-        try:
-            token = self.feishu_gateway.get_tenant_access_token()
-            url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reply"
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "msg_type": "text",
-                "content": json.dumps({"text": text}),
-            }
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            self.logger.info(f"回复已发送: {message_id}")
-        except Exception as e:
-            self.logger.error(f"发送回复失败: {e}")
+        for attempt in range(2):
+            try:
+                token = self.feishu_gateway.get_tenant_access_token()
+                url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reply"
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                }
+                payload = {
+                    "msg_type": "text",
+                    "content": json.dumps({"text": text}),
+                }
+                response = requests.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                self.logger.info(f"回复已发送: {message_id}")
+                return
+            except Exception as e:
+                if attempt == 0:
+                    self.logger.warning(f"发送回复失败，刷新 token 重试: {e}")
+                    self.feishu_gateway._tenant_access_token = None
+                else:
+                    self.logger.error(f"发送回复失败: {e}")
 
     def _send_file_reply(self, message_id: str, file_path: str) -> None:
-        try:
-            file_key = self.feishu_gateway.upload_file(file_path)
-            if not file_key:
-                self.logger.error("文件上传失败，未获取到 file_key")
+        for attempt in range(2):
+            try:
+                file_key = self.feishu_gateway.upload_file(file_path)
+                if not file_key:
+                    self.logger.error("文件上传失败，未获取到 file_key")
+                    return
+                token = self.feishu_gateway.get_tenant_access_token()
+                url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reply"
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                }
+                payload = {
+                    "msg_type": "file",
+                    "content": json.dumps({"file_key": file_key}),
+                }
+                response = requests.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                self.logger.info(f"文件回复已发送: {message_id}")
                 return
-            token = self.feishu_gateway.get_tenant_access_token()
-            url = f"https://open.{self.config.domain}.cn/open-apis/im/v1/messages/{message_id}/reply"
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "msg_type": "file",
-                "content": json.dumps({"file_key": file_key}),
-            }
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            self.logger.info(f"文件回复已发送: {message_id}")
-        except Exception as e:
-            self.logger.error(f"发送文件回复失败: {e}")
+            except Exception as e:
+                if attempt == 0:
+                    self.logger.warning(f"发送文件回复失败，刷新 token 重试: {e}")
+                    self.feishu_gateway._tenant_access_token = None
+                else:
+                    self.logger.error(f"发送文件回复失败: {e}")
